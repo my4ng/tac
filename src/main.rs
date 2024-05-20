@@ -1,23 +1,17 @@
-// NEON SIMD intrinsics for aarch64 are not yet stabilized and require the nightly compiler
-#![cfg_attr(all(feature = "nightly", target_arch = "aarch64"), feature(stdsimd))]
-
-mod tac;
-
 fn version() {
-    println!(
-        "tac {} - Copyright Mahmoud Al-Qudsi, NeoSmart Technologies 2017-2021",
-        env!("CARGO_PKG_VERSION")
-    );
-    println!("Report bugs at <https://github.com/neosmart/tac>");
+    println!("Tack {}", env!("CARGO_PKG_VERSION"));
+    println!("Copyright (c) 2024 Michael Yang <admin@my4ng.dev>");
+    println!("Copyright (c) 2017 NeoSmart Technologies <https://neosmart.net/>");
+    println!("Report bugs at <https://github.com/my4ng/tack>");
 }
 
 fn help() {
     version();
-    println!("");
+    println!();
     println!("Usage: tac [OPTIONS] [FILE1..]");
     println!("Write each FILE to standard output, last line first.");
     println!("Reads from stdin if FILE is - or not specified.");
-    println!("");
+    println!();
     println!("Options:");
     println!("  -h --help        Print this help text and exit");
     println!("  -v --version     Print version and exit.");
@@ -32,7 +26,7 @@ fn main() {
     let mut force_flush = false;
     let mut skip_switches = false;
     for arg in args.skip(1) {
-        if !skip_switches && arg.starts_with("-") && arg != "-" {
+        if !skip_switches && arg.starts_with('-') && arg != "-" {
             match arg.as_str() {
                 "-h" | "--help" => {
                     help();
@@ -62,12 +56,12 @@ fn main() {
     }
 
     // Read from stdin by default
-    if files.len() == 0 {
+    if files.is_empty() {
         files.push("-".into());
     }
 
     for file in &files {
-        if let Err(e) = tac::reverse_file(file, force_flush) {
+        if let Err(e) = tac_k::reverse_file(file, force_flush) {
             if e.kind() != std::io::ErrorKind::BrokenPipe {
                 eprintln!("{}: {:?}", file, e);
                 std::process::exit(-1);
