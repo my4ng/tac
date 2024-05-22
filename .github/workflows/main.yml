@@ -1,0 +1,40 @@
+name: Rust
+
+on: [push, workflow_dispatch, pull_request]
+
+jobs:
+  check:
+    env:
+      RUSTFLAGS: "-D warnings"
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Checks
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets
+
+  test-msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@1.70
+
+      - name: Build with MSRV
+        run: cargo build --all-features
