@@ -1,16 +1,20 @@
 [package]
-name = "tac"
+name = "tac-k"
 edition = "2021"
-version = "2.1.0"
-authors = ["Mahmoud Al-Qudsi <mqudsi@neosmart.net>"]
+version = "0.1.1"
+authors = ["Michael Yang <admin@my4ng.dev>"]
 description = "Print lines from file in reverse order"
-homepage = "https://github.com/neosmart/tac"
-repository = "https://github.com/neosmart/tac"
+homepage = "https://github.com/my4ng/tack"
+repository = "https://github.com/my4ng/tack"
 readme = "README.md"
-keywords = ["tac", "reverse", "core", "utils"]
+keywords = ["tac", "reverse", "core", "utils", "simd"]
 categories = ["command-line-utilities"]
 rust-version = "1.70"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 memmap2 = "0.9"
+
+[[bin]]
+name = "tac"
+path = "src/main.rs"
