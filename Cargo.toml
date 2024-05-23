@@ -1,7 +1,7 @@
 [package]
 name = "tac-k"
 edition = "2021"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Michael Yang <admin@my4ng.dev>"]
 description = "Print lines from file in reverse order"
 homepage = "https://github.com/my4ng/tack"
