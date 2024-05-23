@@ -1,4 +1,4 @@
-name: Rust
+name: Main
 
 on: [push, workflow_dispatch, pull_request]
 
@@ -6,7 +6,6 @@ jobs:
   check:
     env:
       RUSTFLAGS: "-D warnings"
-
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
