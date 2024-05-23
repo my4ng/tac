@@ -109,27 +109,21 @@ fn search_auto(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
 
     #[cfg(target_arch = "aarch64")]
     if std::arch::is_aarch64_feature_detected!("neon") {
-        return search128(bytes, &mut output);
+        return unsafe { search128(bytes, &mut output) };
     }
 
     search(bytes, &mut output)
 }
 
 /// This is the default, naïve byte search
+#[inline(always)]
 fn search(bytes: &[u8], output: &mut dyn Write) -> Result<()> {
     let mut last_printed = bytes.len();
-
-    for index in (0..bytes.len()).rev() {
-        if bytes[index] == SEARCH {
-            output.write_all(&bytes[index + 1..last_printed])?;
-            last_printed = index + 1;
-        }
-    }
+    slow_search_and_print(bytes, 0, last_printed, &mut last_printed, output)?;
     output.write_all(&bytes[..last_printed])?;
     Ok(())
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64"))]
 #[inline(always)]
 /// Search a range index-by-index and write to `output` when a match is found. Primarily used to
 /// search before/after the aligned portion of a range.
@@ -241,9 +235,10 @@ unsafe fn search256(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
 }
 
 #[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "neon")]
 /// This is a NEON/AdvSIMD-optimized newline search function that searches a 16-byte (128-bit) window
 /// instead of scanning character-by-character (once aligned).
-fn search128(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
+unsafe fn search128(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
     use core::arch::aarch64::*;
 
     let ptr = bytes.as_ptr();
