@@ -7,47 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            name: tack-linux.tar.gz
-          - os: macos-latest
-            name: tack-macos.tar.gz
-          - os: windows-latest
-            name: tack-windows.zip
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build
-        run: cargo build --release --locked
-
-      - name: Archive
-        if: matrix.os == 'windows-latest'
-        run: |
-          copy target\release\tac.exe tac.exe
-          7z a ${{ matrix.name }} tac.exe README.md CONTRIBUTORS.md LICENSE-MIT LICENSE-APACHE
-
-      - name: Archive
-        if: matrix.os != 'windows-latest'
-        run: | 
-          cp target/release/tac tac
-          tar czvf ${{ matrix.name }} tac README.md CONTRIBUTORS.md LICENSE-MIT LICENSE-APACHE
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}
-          path: ${{ matrix.name }}
-          if-no-files-found: error
+    uses: ./.github/workflows/build.yml
 
   release:
     needs: build
