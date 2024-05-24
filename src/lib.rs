@@ -158,6 +158,9 @@ fn slow_search_and_print(
 /// BMI2 is explicitly opted into to inline the BZHI instruction; otherwise a call to the intrinsic
 /// function is added and not inlined.
 unsafe fn search256(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
+    #[cfg(target_arch = "x86")]
+    use core::arch::x86::*;
+    #[cfg(target_arch = "x86_64")]
     use core::arch::x86_64::*;
 
     const ALIGNMENT: usize = std::mem::align_of::<__m256i>();
