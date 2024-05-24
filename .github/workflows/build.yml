@@ -56,26 +56,26 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           copy target\${{ matrix.target }}\release\tac.exe tac.exe
-          7z a tack-${{ matrix.target }}.zip tac.exe README.md CONTRIBUTORS.md LICENSE-MIT LICENSE-APACHE
+          7z a tac-k_${{ matrix.target }}.zip tac.exe README.md CONTRIBUTORS.md LICENSE-MIT LICENSE-APACHE
 
       - name: Archive
         if: matrix.os != 'windows-latest'
         run: |
           cp target/${{ matrix.target }}/release/tac tac
-          tar czvf tack-${{ matrix.target }}.tar.gz tac README.md CONTRIBUTORS.md LICENSE-MIT LICENSE-APACHE
+          tar czvf tac-k_${{ matrix.target }}.tar.gz tac README.md CONTRIBUTORS.md LICENSE-MIT LICENSE-APACHE
 
       - name: Upload Artifact
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: tack-${{ matrix.target }}.zip
-          path: tack-${{ matrix.target }}.zip
+          name: tac-k_${{ matrix.target }}.zip
+          path: tac-k_${{ matrix.target }}.zip
           if-no-files-found: error
 
       - name: Upload Artifact
         if: matrix.os != 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: tack-${{ matrix.target }}.tar.gz
-          path: tack-${{ matrix.target }}.tar.gz
+          name: tac-k_${{ matrix.target }}.tar.gz
+          path: tac-k_${{ matrix.target }}.tar.gz
           if-no-files-found: error
