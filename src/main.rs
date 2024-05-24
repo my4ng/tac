@@ -1,3 +1,7 @@
+use tac_k::reverse_file;
+
+use std::io::{BufWriter, IsTerminal, StdoutLock, Write};
+
 fn version() {
     println!("Tack {}", env!("CARGO_PKG_VERSION"));
     println!("Copyright (c) 2024 Michael Yang <admin@my4ng.dev>");
@@ -16,6 +20,27 @@ fn help() {
     println!("  -h --help        Print this help text and exit");
     println!("  -v --version     Print version and exit.");
     println!("  --line-buffered  Always flush output after each line.");
+}
+
+enum Writer {
+    StdOut(StdoutLock<'static>),
+    Buffered(BufWriter<StdoutLock<'static>>),
+}
+
+impl Write for Writer {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            Writer::StdOut(stdout) => stdout.write(buf),
+            Writer::Buffered(buffered) => buffered.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            Writer::StdOut(stdout) => stdout.flush(),
+            Writer::Buffered(buffered) => buffered.flush(),
+        }
+    }
 }
 
 fn main() {
@@ -60,8 +85,15 @@ fn main() {
         files.push("-".into());
     }
 
+    let stdout = std::io::stdout().lock();
+    let mut writer = if force_flush || stdout.is_terminal() {
+        Writer::StdOut(stdout)
+    } else {
+        Writer::Buffered(BufWriter::new(stdout))
+    };
+
     for file in &files {
-        if let Err(e) = tac_k::reverse_file(file, force_flush) {
+        if let Err(e) = reverse_file(&mut writer, file) {
             if e.kind() != std::io::ErrorKind::BrokenPipe {
                 eprintln!("{}: {:?}", file, e);
                 std::process::exit(-1);

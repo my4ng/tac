@@ -2,7 +2,7 @@ use memmap2::Mmap;
 
 use std::fs::File;
 use std::io::prelude::*;
-use std::io::{BufWriter, IsTerminal, Result};
+use std::io::Result;
 
 const SEARCH: u8 = b'\n';
 const MAX_BUF_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
@@ -13,89 +13,93 @@ const MAX_BUF_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
     allow(unused_mut),
     allow(unused_variables)
 )]
-pub fn reverse_file(path: &str, force_flush: bool) -> Result<()> {
-    let mut temp_path = None;
-    {
-        let mmap;
-        let mut buf;
-        let bytes = match path {
-            #[cfg_attr(not(target_family = "unix"), allow(unused_labels))]
-            "-" => 'stdin: {
-                // Depending on what the STDIN fd actually points to, it may still be possible to
-                // mmap the input (e.g. in case of `tac - < foo.txt`).
-                #[cfg(target_family = "unix")]
-                {
-                    let stdin = std::io::stdin();
-                    mmap = unsafe { Mmap::map(&stdin)? };
-                    break 'stdin &mmap[..];
-                }
-
-                // We unfortunately need to buffer the entirety of the stdin input first;
-                // we try to do so purely in memory but will switch to a backing file if
-                // the input exceeds MAX_BUF_SIZE.
-                buf = vec![0; MAX_BUF_SIZE];
-                let mut reader = std::io::stdin();
-                let mut total_read = 0;
-
-                // Once/if we switch to a file-backed buffer, this will contain the handle.
-                loop {
-                    let bytes_read = reader.read(&mut buf[total_read..])?;
-                    if bytes_read == 0 {
-                        break &buf[0..total_read];
+/// Write the reversed content from `path` into `writer`.
+///
+/// If `path` is `"-"`, then read from `stdin` instead.
+///
+/// ## Example
+///
+/// ```
+/// use tac_k::reverse_file;
+///
+/// let mut result = vec![];
+/// reverse_file(&mut result, "README.md").unwrap();
+///
+/// assert!(std::str::from_utf8(&result).is_ok());
+/// ```
+// TODO: Generalize this further to take &mut Read rather than &str
+pub fn reverse_file<W: Write>(writer: &mut W, path: &str) -> Result<()> {
+    fn inner(writer: &mut dyn Write, path: &str) -> Result<()> {
+        let mut temp_path = None;
+        {
+            let mmap;
+            let mut buf;
+            let bytes = match path {
+                #[cfg_attr(not(target_family = "unix"), allow(unused_labels))]
+                "-" => 'stdin: {
+                    // Depending on what the STDIN fd actually points to, it may still be possible to
+                    // mmap the input (e.g. in case of `tac - < foo.txt`).
+                    #[cfg(target_family = "unix")]
+                    {
+                        let stdin = std::io::stdin();
+                        mmap = unsafe { Mmap::map(&stdin)? };
+                        break 'stdin &mmap[..];
                     }
-                    total_read += bytes_read;
 
-                    if total_read == MAX_BUF_SIZE {
-                        temp_path =
-                            Some(std::env::temp_dir().join(format!(".tac-{}", std::process::id())));
-                        let mut temp_file = File::create(temp_path.as_ref().unwrap())?;
-                        // Write everything we've read so far
-                        temp_file.write_all(&buf)?;
-                        // Copy remaining bytes directly from stdin
-                        std::io::copy(&mut reader, &mut temp_file)?;
-                        mmap = unsafe { Mmap::map(&temp_file)? };
-                        break &mmap[..];
+                    // We unfortunately need to buffer the entirety of the stdin input first;
+                    // we try to do so purely in memory but will switch to a backing file if
+                    // the input exceeds MAX_BUF_SIZE.
+                    buf = vec![0; MAX_BUF_SIZE];
+                    let mut reader = std::io::stdin();
+                    let mut total_read = 0;
+
+                    // Once/if we switch to a file-backed buffer, this will contain the handle.
+                    loop {
+                        let bytes_read = reader.read(&mut buf[total_read..])?;
+                        if bytes_read == 0 {
+                            break &buf[0..total_read];
+                        }
+                        total_read += bytes_read;
+
+                        if total_read == MAX_BUF_SIZE {
+                            temp_path = Some(
+                                std::env::temp_dir().join(format!(".tac-{}", std::process::id())),
+                            );
+                            let mut temp_file = File::create(temp_path.as_ref().unwrap())?;
+                            // Write everything we've read so far
+                            temp_file.write_all(&buf)?;
+                            // Copy remaining bytes directly from stdin
+                            std::io::copy(&mut reader, &mut temp_file)?;
+                            mmap = unsafe { Mmap::map(&temp_file)? };
+                            break &mmap[..];
+                        }
                     }
                 }
-            }
-            _ => {
-                let file = File::open(path)?;
-                mmap = unsafe { Mmap::map(&file)? };
-                &mmap[..]
-            }
-        };
+                _ => {
+                    let file = File::open(path)?;
+                    mmap = unsafe { Mmap::map(&file)? };
+                    &mmap[..]
+                }
+            };
 
-        let output = std::io::stdout();
-        let mut output = output.lock();
-        let mut buffered_output;
-
-        let mut output: &mut dyn Write = if force_flush || output.is_terminal() {
-            &mut output
-        } else {
-            buffered_output = BufWriter::new(output);
-            &mut buffered_output
-        };
-
-        if bytes.is_empty() {
-            // Do nothing. This avoids an underflow in the search functions which expect there to
-            // be at least one byte.
-        } else {
-            search_auto(bytes, &mut output)?;
+            search_auto(bytes, writer)?;
         }
-    }
 
-    if let Some(ref path) = temp_path.as_ref() {
-        // This should never fail unless we've somehow kept a handle open to it
-        if let Err(e) = std::fs::remove_file(path) {
-            eprintln!(
-                "Error: failed to remove temporary file {}\n{}",
-                path.display(),
-                e
-            )
-        };
-    }
+        if let Some(ref path) = temp_path.as_ref() {
+            // This should never fail unless we've somehow kept a handle open to it
+            if let Err(e) = std::fs::remove_file(path) {
+                eprintln!(
+                    "Error: failed to remove temporary file {}\n{}",
+                    path.display(),
+                    e
+                )
+            };
+        }
 
-    Ok(())
+        writer.flush()?;
+        Ok(())
+    }
+    inner(writer, path)
 }
 
 fn search_auto(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
