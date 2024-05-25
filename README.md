@@ -1,5 +1,7 @@
 # Tack
 
+[![Crates.io Version](https://img.shields.io/crates/v/tac-k)](https://crates.io/crates/tac-k) [![docs.rs](https://img.shields.io/docsrs/tac-k)](https://docs.rs/tac-k/) ![Crates.io License](https://img.shields.io/crates/l/tac-k)
+
 Tack is a **fork** of the [tac](https://github.com/neosmart/tac) crate.
 
 Tack is a high-performance, simd-accelerated, cross-platform rewrite of the [GNU `tac` utility](https://www.gnu.org/software/coreutils/manual/html_node/tac-invocation.html#tac-invocation) from Coreutils, released under MIT/Apache-2.0 licenses. `tac` reads input from a file (or from `stdin`, but [see below](#implementation-notes)) and then prints it line-by-line backwards.
