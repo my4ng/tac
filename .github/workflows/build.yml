@@ -6,7 +6,7 @@ jobs:
   build:
     env:
       RUSTFLAGS: "-D warnings"
-    name: Build ${{ matrix.os }}
+    name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
