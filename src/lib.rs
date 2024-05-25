@@ -167,6 +167,11 @@ unsafe fn search256(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
     #[cfg(target_arch = "x86_64")]
     use core::arch::x86_64::*;
 
+    #[cfg(target_arch = "x86")]
+    const SIZE: u32 = 32;
+    #[cfg(target_arch = "x86_64")]
+    const SIZE: u32 = 64;
+
     const ALIGNMENT: usize = std::mem::align_of::<__m256i>();
 
     let ptr = bytes.as_ptr();
@@ -185,7 +190,7 @@ unsafe fn search256(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
         if align_offset != 0 {
             let aligned_index = len + align_offset - ALIGNMENT;
             debug_assert!(aligned_index < len && aligned_index > 0);
-            debug_assert!((ptr as usize + aligned_index) % ALIGNMENT == 0,);
+            debug_assert!((ptr as usize + aligned_index) % ALIGNMENT == 0);
 
             // eprintln!("Unoptimized search from {} to {}", aligned_index, last_printed);
             slow_search_and_print(bytes, aligned_index, len, &mut last_printed, &mut output)?;
@@ -196,19 +201,28 @@ unsafe fn search256(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
         }
 
         let pattern256 = unsafe { _mm256_set1_epi8(SEARCH as i8) };
-        while remaining >= 64 {
+        while remaining >= SIZE as usize {
             let window_end_offset = remaining;
             unsafe {
                 remaining -= 32;
                 let search256 = _mm256_load_si256(ptr.add(remaining) as *const __m256i);
                 let result256 = _mm256_cmpeq_epi8(search256, pattern256);
-                let mut matches = _mm256_movemask_epi8(result256) as u32 as u64;
+                let part = _mm256_movemask_epi8(result256) as u32;
+                let mut matches;
 
-                // Partially unroll this loop by repeating the above again before handling results
-                remaining -= 32;
-                let search256 = _mm256_load_si256(ptr.add(remaining) as *const __m256i);
-                let result256 = _mm256_cmpeq_epi8(search256, pattern256);
-                matches = (matches << 32) | _mm256_movemask_epi8(result256) as u32 as u64;
+                // For 32-bit x86 architecture only one part can be loaded. 64-bit x86_64 can load another part
+                // to find the matches.
+                #[cfg(target_arch = "x86")]
+                {
+                    matches = part;
+                }
+                #[cfg(target_arch = "x86_64")]
+                {
+                    remaining -= 32;
+                    let search256 = _mm256_load_si256(ptr.add(remaining) as *const __m256i);
+                    let result256 = _mm256_cmpeq_epi8(search256, pattern256);
+                    matches = ((part as u64) << 32) | _mm256_movemask_epi8(result256) as u32 as u64;
+                }
 
                 while matches != 0 {
                     // We would count *trailing* zeroes to find new lines in reverse order, but the
@@ -222,9 +236,15 @@ unsafe fn search256(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
                     output.write_all(&bytes[offset..last_printed])?;
                     last_printed = offset;
 
-                    // Clear this match from the matches bitset. The equivalent:
-                    // matches &= !(1 << (64 - leading - 1));
-                    matches = _bzhi_u64(matches, 63 - leading);
+                    // Clear this match from the matches bitset.
+                    #[cfg(target_arch = "x86")]
+                    {
+                        matches = _bzhi_u32(matches, SIZE - 1 - leading);
+                    }
+                    #[cfg(target_arch = "x86_64")]
+                    {
+                        matches = _bzhi_u64(matches, SIZE - 1 - leading);
+                    }
                 }
             }
         }
