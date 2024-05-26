@@ -18,3 +18,7 @@ memmap2 = "0.9"
 [[bin]]
 name = "tac"
 path = "src/main.rs"
+
+[profile.release]
+strip = true
+lto = true
