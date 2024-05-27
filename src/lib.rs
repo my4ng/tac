@@ -3,6 +3,7 @@ use memmap2::Mmap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::Result;
+use std::path::Path;
 
 const SEARCH: u8 = b'\n';
 const MAX_BUF_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
@@ -15,28 +16,36 @@ const MAX_BUF_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
 )]
 /// Write the reversed content from `path` into `writer`.
 ///
-/// If `path` is `"-"`, then read from `stdin` instead.
+/// If `path` is `Some(_)`, read from the file at the specified path.
+/// If `path` is `None`, read from `stdin` instead.
 ///
 /// ## Example
 ///
 /// ```
 /// use tac_k::reverse_file;
-///
+/// use std::path::Path;
+/// 
+/// // Read from `README.md` file.
 /// let mut result = vec![];
-/// reverse_file(&mut result, "README.md").unwrap();
+/// reverse_file(&mut result, Some(Path::new("README.md"))).unwrap();
 ///
 /// assert!(std::str::from_utf8(&result).is_ok());
+/// 
+/// // Read from stdin.
+/// let mut result = vec![];
+/// reverse_file(&mut result, None).unwrap();
+/// 
+/// assert!(result.is_empty());
 /// ```
-// TODO: Generalize this further to take &mut Read rather than &str
-pub fn reverse_file<W: Write>(writer: &mut W, path: &str) -> Result<()> {
-    fn inner(writer: &mut dyn Write, path: &str) -> Result<()> {
+pub fn reverse_file<W: Write>(writer: &mut W, path: Option<&Path>) -> Result<()> {
+    fn inner(writer: &mut dyn Write, path: Option<&Path>) -> Result<()> {
         let mut temp_path = None;
         {
             let mmap;
             let mut buf;
             let bytes = match path {
                 #[cfg_attr(not(target_family = "unix"), allow(unused_labels))]
-                "-" => 'stdin: {
+                None => 'stdin: {
                     // Depending on what the STDIN fd actually points to, it may still be possible to
                     // mmap the input (e.g. in case of `tac - < foo.txt`).
                     #[cfg(target_family = "unix")]
@@ -77,7 +86,7 @@ pub fn reverse_file<W: Write>(writer: &mut W, path: &str) -> Result<()> {
                         }
                     }
                 }
-                _ => {
+                Some(path) => {
                     let file = File::open(path)?;
                     mmap = unsafe { Mmap::map(&file)? };
                     &mmap[..]

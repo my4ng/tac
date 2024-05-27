@@ -1,7 +1,10 @@
 use clap::{command, crate_authors, crate_description, crate_version, Arg, ArgAction};
 use tac_k::reverse_file;
 
-use std::io::{BufWriter, IsTerminal, StdoutLock, Write};
+use std::{
+    io::{BufWriter, IsTerminal, StdoutLock, Write},
+    path::Path,
+};
 enum Writer {
     StdOut(StdoutLock<'static>),
     Buffered(BufWriter<StdoutLock<'static>>),
@@ -52,9 +55,7 @@ fn main() {
         .get_matches();
 
     let force_flush = matches.get_flag("force_flush");
-    let files = matches
-        .get_many::<String>("files")
-        .map_or_else(|| vec!["-"], |iter| iter.map(AsRef::as_ref).collect());
+    let files = matches.get_many::<String>("files");
 
     let stdout = std::io::stdout().lock();
     let mut writer = if force_flush || stdout.is_terminal() {
@@ -63,12 +64,21 @@ fn main() {
         Writer::Buffered(BufWriter::new(stdout))
     };
 
-    for file in files {
-        if let Err(e) = reverse_file(&mut writer, file) {
-            if e.kind() != std::io::ErrorKind::BrokenPipe {
-                eprintln!("{}: {:?}", file, e);
-                std::process::exit(-1);
-            }
+    if let Some(files) = files {
+        files.for_each(|f| reverse(&mut writer, f));
+    } else {
+        reverse(&mut writer, "-");
+    }
+}
+
+#[inline]
+fn reverse<W: Write>(writer: &mut W, file: &str) {
+    let path = if file == "-" { None } else { Some(Path::new(file)) };
+
+    if let Err(e) = reverse_file(writer, path) {
+        if matches!(e.kind(), std::io::ErrorKind::BrokenPipe) {
+            eprintln!("{}: {:?}", file, e);
+            std::process::exit(-1);
         }
     }
 }
