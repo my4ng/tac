@@ -24,17 +24,17 @@ const MAX_BUF_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
 /// ```
 /// use tac_k::reverse_file;
 /// use std::path::Path;
-/// 
+///
 /// // Read from `README.md` file.
 /// let mut result = vec![];
 /// reverse_file(&mut result, Some(Path::new("README.md"))).unwrap();
 ///
 /// assert!(std::str::from_utf8(&result).is_ok());
-/// 
+///
 /// // Read from stdin.
 /// let mut result = vec![];
 /// reverse_file(&mut result, None).unwrap();
-/// 
+///
 /// assert!(result.is_empty());
 /// ```
 pub fn reverse_file<W: Write>(writer: &mut W, path: Option<&Path>) -> Result<()> {
@@ -73,9 +73,7 @@ pub fn reverse_file<W: Write>(writer: &mut W, path: Option<&Path>) -> Result<()>
                         total_read += bytes_read;
 
                         if total_read == MAX_BUF_SIZE {
-                            temp_path = Some(
-                                std::env::temp_dir().join(format!(".tac-{}", std::process::id())),
-                            );
+                            temp_path = Some(std::env::temp_dir().join(format!(".tac-{}", std::process::id())));
                             let mut temp_file = File::create(temp_path.as_ref().unwrap())?;
                             // Write everything we've read so far
                             temp_file.write_all(&buf)?;
@@ -99,11 +97,7 @@ pub fn reverse_file<W: Write>(writer: &mut W, path: Option<&Path>) -> Result<()>
         if let Some(ref path) = temp_path.as_ref() {
             // This should never fail unless we've somehow kept a handle open to it
             if let Err(e) = std::fs::remove_file(path) {
-                eprintln!(
-                    "Error: failed to remove temporary file {}\n{}",
-                    path.display(),
-                    e
-                )
+                eprintln!("Error: failed to remove temporary file {}\n{}", path.display(), e)
             };
         }
 
@@ -115,10 +109,7 @@ pub fn reverse_file<W: Write>(writer: &mut W, path: Option<&Path>) -> Result<()>
 
 fn search_auto(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    if is_x86_feature_detected!("avx2")
-        && is_x86_feature_detected!("lzcnt")
-        && is_x86_feature_detected!("bmi2")
-    {
+    if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("lzcnt") && is_x86_feature_detected!("bmi2") {
         return unsafe { search256(bytes, &mut output) };
     }
 
@@ -291,13 +282,7 @@ unsafe fn search128(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
         let aligned_index = index + align_offset - 16;
 
         // eprintln!("Unoptimized search from {} to {}", aligned_index, last_printed);
-        slow_search_and_print(
-            bytes,
-            aligned_index,
-            last_printed,
-            &mut last_printed,
-            &mut output,
-        )?;
+        slow_search_and_print(bytes, aligned_index, last_printed, &mut last_printed, &mut output)?;
         index = aligned_index;
 
         let pattern128 = unsafe { vdupq_n_u8(SEARCH) };
@@ -328,8 +313,7 @@ unsafe fn search128(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
                 // https://branchfree.org/2019/04/01/fitting-my-head-through-the-arm-holes/
                 let mut matches = {
                     let bit_mask: uint8x16_t = std::mem::transmute([
-                        0x01u8, 0x02, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80, 0x01, 0x02, 0x4, 0x8, 0x10,
-                        0x20, 0x40, 0x80,
+                        0x01u8, 0x02, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80, 0x01, 0x02, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80,
                     ]);
                     let t0 = vandq_u8(result128_3, bit_mask);
                     let t1 = vandq_u8(result128_2, bit_mask);
