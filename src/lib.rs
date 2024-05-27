@@ -42,8 +42,10 @@ pub fn reverse_file<W: Write>(writer: &mut W, path: &str) -> Result<()> {
                     #[cfg(target_family = "unix")]
                     {
                         let stdin = std::io::stdin();
-                        mmap = unsafe { Mmap::map(&stdin)? };
-                        break 'stdin &mmap[..];
+                        if let Ok(stdin) = unsafe { Mmap::map(&stdin) } {
+                            mmap = stdin;
+                            break 'stdin &mmap[..];
+                        }
                     }
 
                     // We unfortunately need to buffer the entirety of the stdin input first;
