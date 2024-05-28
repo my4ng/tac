@@ -19,6 +19,11 @@ const MAX_BUF_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
 /// If `path` is `Some(_)`, read from the file at the specified path.
 /// If `path` is `None`, read from `stdin` instead.
 ///
+/// Internally it uses the following instruction set extensions
+/// to enable SIMD acceleration if available at runtime:
+/// - AVX2/LZCNT(ABM)/BMI2 on x64/x64_84
+/// - NEON on AArch64
+///
 /// ## Example
 ///
 /// ```
@@ -27,17 +32,17 @@ const MAX_BUF_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
 ///
 /// // Read from `README.md` file.
 /// let mut result = vec![];
-/// reverse_file(&mut result, Some(Path::new("README.md"))).unwrap();
+/// reverse_file(&mut result, Some("README.md")).unwrap();
 ///
 /// assert!(std::str::from_utf8(&result).is_ok());
 ///
 /// // Read from stdin.
 /// let mut result = vec![];
-/// reverse_file(&mut result, None).unwrap();
+/// reverse_file(&mut result, None::<&str>).unwrap();
 ///
 /// assert!(result.is_empty());
 /// ```
-pub fn reverse_file<W: Write>(writer: &mut W, path: Option<&Path>) -> Result<()> {
+pub fn reverse_file<W: Write, P: AsRef<Path>>(writer: &mut W, path: Option<P>) -> Result<()> {
     fn inner(writer: &mut dyn Write, path: Option<&Path>) -> Result<()> {
         let mut temp_path = None;
         {
@@ -104,7 +109,7 @@ pub fn reverse_file<W: Write>(writer: &mut W, path: Option<&Path>) -> Result<()>
         writer.flush()?;
         Ok(())
     }
-    inner(writer, path)
+    inner(writer, path.as_ref().map(AsRef::as_ref))
 }
 
 fn search_auto(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
