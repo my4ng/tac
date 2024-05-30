@@ -15,14 +15,18 @@ Good question. Try grepping through a multi-gigabyte web access log file in reve
 ## Usage
 
 ```bash
-Usage: tac [OPTIONS] [FILE1..]
-Write each FILE to standard output, last line first.
-Reads from stdin if FILE is - or not specified.
+Usage: tac [OPTIONS] [FILE]...
+
+Arguments:
+  [FILE]...  Files to be reversed.
+             Read from stdin if it is `-` or not specified.
 
 Options:
-  -h --help        Print this help text and exit
-  -v --version     Print version and exit.
-  --line-buffered  Always flush output after each line.
+  -s, --separator <BYTE>  Use BYTE as the separator instead of newline.
+                          Only single-byte character is supported.
+      --line-buffered     Always flush output after each line
+  -h, --help              Print help
+  -V, --version           Print version
 ```
 
 Tack reads lines from any combination of `stdin` and/or zero or more files and writes the lines to the output in reverse order.
@@ -33,6 +37,10 @@ Tack reads lines from any combination of `stdin` and/or zero or more files and w
 $ echo -e "hello\nworld" | tac
 world
 hello
+
+$ echo -e "hello\nworld" | tac --separator=o
+rld
+wohello%
 ```
 
 ## Installation

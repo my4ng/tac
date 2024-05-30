@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::{command, crate_authors, crate_description, crate_version, Arg, ArgAction};
 use tac_k::reverse_file;
 
@@ -32,7 +33,7 @@ const HELP_TEMPLATE: &str = "\
 
 {all-args}";
 
-fn main() {
+fn main() -> Result<()> {
     #[allow(non_upper_case_globals)]
     let matches = command!()
         .name("tac")
@@ -40,6 +41,20 @@ fn main() {
         .author(crate_authors!("\n"))
         .version(crate_version!())
         .help_template(HELP_TEMPLATE)
+        .arg(
+            Arg::new("separator")
+                .value_name("BYTE")
+                .long("separator")
+                .short('s')
+                .value_parser(|str: &str| {
+                    if str.len() != 1 {
+                        Err("Only single-byte character is supported")
+                    } else {
+                        Ok(str.as_bytes()[0])
+                    }
+                })
+                .help("Use BYTE as the separator instead of newline.\nOnly single-byte character is supported."),
+        )
         .arg(
             Arg::new("force_flush")
                 .long("line-buffered")
@@ -56,6 +71,7 @@ fn main() {
 
     let force_flush = matches.get_flag("force_flush");
     let files = matches.get_many::<String>("files");
+    let separator = matches.get_one::<u8>("separator").copied().unwrap_or(b'\n');
 
     let stdout = std::io::stdout().lock();
     let mut writer = if force_flush || stdout.is_terminal() {
@@ -65,20 +81,19 @@ fn main() {
     };
 
     if let Some(files) = files {
-        files.for_each(|f| reverse(&mut writer, f));
+        for file in files {
+            reverse(&mut writer, file, separator)?;
+        }
     } else {
-        reverse(&mut writer, "-");
+        reverse(&mut writer, "-", separator)?;
     }
+
+    Ok(())
 }
 
 #[inline]
-fn reverse<W: Write>(writer: &mut W, file: &str) {
+fn reverse<W: Write>(writer: &mut W, file: &str, separator: u8) -> Result<()> {
     let path = if file == "-" { None } else { Some(Path::new(file)) };
-
-    if let Err(e) = reverse_file(writer, path) {
-        if matches!(e.kind(), std::io::ErrorKind::BrokenPipe) {
-            eprintln!("{}: {:?}", file, e);
-            std::process::exit(-1);
-        }
-    }
+    reverse_file(writer, path, separator)?;
+    Ok(())
 }

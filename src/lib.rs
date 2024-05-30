@@ -5,7 +5,6 @@ use std::io::prelude::*;
 use std::io::Result;
 use std::path::Path;
 
-const SEARCH: u8 = b'\n';
 const MAX_BUF_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
 
 #[cfg_attr(
@@ -14,10 +13,13 @@ const MAX_BUF_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
     allow(unused_mut),
     allow(unused_variables)
 )]
-/// Write the reversed content from `path` into `writer`.
+/// Write the reversed content from `path` into `writer`, last line first.
 ///
 /// If `path` is `Some(_)`, read from the file at the specified path.
 /// If `path` is `None`, read from `stdin` instead.
+///
+/// `separator` is used to partition the content into lines.
+/// This is normally the newline character, `b'\n'`.
 ///
 /// Internally it uses the following instruction set extensions
 /// to enable SIMD acceleration if available at runtime:
@@ -30,20 +32,20 @@ const MAX_BUF_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
 /// use tac_k::reverse_file;
 /// use std::path::Path;
 ///
-/// // Read from `README.md` file.
+/// // Read from `README.md` file, separated by '.'.
 /// let mut result = vec![];
-/// reverse_file(&mut result, Some("README.md")).unwrap();
+/// reverse_file(&mut result, Some("README.md"), b'.').unwrap();
 ///
 /// assert!(std::str::from_utf8(&result).is_ok());
 ///
 /// // Read from stdin.
 /// let mut result = vec![];
-/// reverse_file(&mut result, None::<&str>).unwrap();
+/// reverse_file(&mut result, None::<&str>, b'.').unwrap();
 ///
 /// assert!(result.is_empty());
 /// ```
-pub fn reverse_file<W: Write, P: AsRef<Path>>(writer: &mut W, path: Option<P>) -> Result<()> {
-    fn inner(writer: &mut dyn Write, path: Option<&Path>) -> Result<()> {
+pub fn reverse_file<W: Write, P: AsRef<Path>>(writer: &mut W, path: Option<P>, separator: u8) -> Result<()> {
+    fn inner(writer: &mut dyn Write, path: Option<&Path>, separator: u8) -> Result<()> {
         let mut temp_path = None;
         {
             let mmap;
@@ -96,7 +98,7 @@ pub fn reverse_file<W: Write, P: AsRef<Path>>(writer: &mut W, path: Option<P>) -
                 }
             };
 
-            search_auto(bytes, writer)?;
+            search_auto(bytes, separator, writer)?;
         }
 
         if let Some(ref path) = temp_path.as_ref() {
@@ -109,28 +111,28 @@ pub fn reverse_file<W: Write, P: AsRef<Path>>(writer: &mut W, path: Option<P>) -
         writer.flush()?;
         Ok(())
     }
-    inner(writer, path.as_ref().map(AsRef::as_ref))
+    inner(writer, path.as_ref().map(AsRef::as_ref), separator)
 }
 
-fn search_auto(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
+fn search_auto(bytes: &[u8], separator: u8, mut output: &mut dyn Write) -> Result<()> {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("lzcnt") && is_x86_feature_detected!("bmi2") {
-        return unsafe { search256(bytes, &mut output) };
+        return unsafe { search256(bytes, separator, &mut output) };
     }
 
     #[cfg(target_arch = "aarch64")]
     if std::arch::is_aarch64_feature_detected!("neon") {
-        return unsafe { search128(bytes, &mut output) };
+        return unsafe { search128(bytes, separator, &mut output) };
     }
 
-    search(bytes, &mut output)
+    search(bytes, separator, &mut output)
 }
 
 /// This is the default, naïve byte search
 #[inline(always)]
-fn search(bytes: &[u8], output: &mut dyn Write) -> Result<()> {
+fn search(bytes: &[u8], separator: u8, output: &mut dyn Write) -> Result<()> {
     let mut last_printed = bytes.len();
-    slow_search_and_print(bytes, 0, last_printed, &mut last_printed, output)?;
+    slow_search_and_print(bytes, 0, last_printed, &mut last_printed, separator, output)?;
     output.write_all(&bytes[..last_printed])?;
     Ok(())
 }
@@ -143,10 +145,11 @@ fn slow_search_and_print(
     start: usize,
     end: usize,
     stop: &mut usize,
+    separator: u8,
     output: &mut dyn Write,
 ) -> Result<()> {
     for index in (start..end).rev() {
-        if bytes[index] == SEARCH {
+        if bytes[index] == separator {
             output.write_all(&bytes[index + 1..*stop])?;
             *stop = index + 1;
         }
@@ -168,7 +171,7 @@ fn slow_search_and_print(
 ///
 /// BMI2 is explicitly opted into to inline the BZHI instruction; otherwise a call to the intrinsic
 /// function is added and not inlined.
-unsafe fn search256(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
+unsafe fn search256(bytes: &[u8], separator: u8, mut output: &mut dyn Write) -> Result<()> {
     #[cfg(target_arch = "x86")]
     use core::arch::x86::*;
     #[cfg(target_arch = "x86_64")]
@@ -200,14 +203,14 @@ unsafe fn search256(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
             debug_assert!((ptr as usize + aligned_index) % ALIGNMENT == 0);
 
             // eprintln!("Unoptimized search from {} to {}", aligned_index, last_printed);
-            slow_search_and_print(bytes, aligned_index, len, &mut last_printed, &mut output)?;
+            slow_search_and_print(bytes, aligned_index, len, &mut last_printed, separator, &mut output)?;
             remaining = aligned_index;
         } else {
             // `bytes` end in an aligned block, no need to offset
             debug_assert!((ptr as usize + len) % ALIGNMENT == 0);
         }
 
-        let pattern256 = unsafe { _mm256_set1_epi8(SEARCH as i8) };
+        let pattern256 = unsafe { _mm256_set1_epi8(separator as i8) };
         while remaining >= SIZE as usize {
             let window_end_offset = remaining;
             unsafe {
@@ -259,7 +262,7 @@ unsafe fn search256(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
 
     if remaining != 0 {
         // eprintln!("Unoptimized end search from {} to {}", 0, index);
-        slow_search_and_print(bytes, 0, remaining, &mut last_printed, &mut output)?;
+        slow_search_and_print(bytes, 0, remaining, &mut last_printed, separator, &mut output)?;
     }
 
     // Regardless of whether or not `index` is zero, as this is predicated on `last_printed`
@@ -272,7 +275,7 @@ unsafe fn search256(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
 #[target_feature(enable = "neon")]
 /// This is a NEON/AdvSIMD-optimized newline search function that searches a 16-byte (128-bit) window
 /// instead of scanning character-by-character (once aligned).
-unsafe fn search128(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
+unsafe fn search128(bytes: &[u8], separator: u8, mut output: &mut dyn Write) -> Result<()> {
     use core::arch::aarch64::*;
 
     let ptr = bytes.as_ptr();
@@ -287,10 +290,17 @@ unsafe fn search128(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
         let aligned_index = index + align_offset - 16;
 
         // eprintln!("Unoptimized search from {} to {}", aligned_index, last_printed);
-        slow_search_and_print(bytes, aligned_index, last_printed, &mut last_printed, &mut output)?;
+        slow_search_and_print(
+            bytes,
+            aligned_index,
+            last_printed,
+            &mut last_printed,
+            separator,
+            &mut output,
+        )?;
         index = aligned_index;
 
-        let pattern128 = unsafe { vdupq_n_u8(SEARCH) };
+        let pattern128 = unsafe { vdupq_n_u8(separator) };
         while index >= 64 {
             let window_end_offset = index;
             unsafe {
@@ -350,7 +360,7 @@ unsafe fn search128(bytes: &[u8], mut output: &mut dyn Write) -> Result<()> {
 
     if index != 0 {
         // eprintln!("Unoptimized end search from {} to {}", 0, index);
-        slow_search_and_print(bytes, 0, index, &mut last_printed, &mut output)?;
+        slow_search_and_print(bytes, 0, index, &mut last_printed, separator, &mut output)?;
     }
 
     // Regardless of whether or not `index` is zero, as this is predicated on `last_printed`
@@ -378,8 +388,8 @@ mod tests {
         fn test(buf: &[u8]) {
             let mut slow_result = Vec::new();
             let mut simd_result = Vec::new();
-            search(buf, &mut slow_result).unwrap();
-            unsafe { search256(buf, &mut simd_result).unwrap() };
+            search(buf, b'.', &mut slow_result).unwrap();
+            unsafe { search256(buf, b'.', &mut simd_result).unwrap() };
             assert_eq!(slow_result, simd_result);
         }
     }
