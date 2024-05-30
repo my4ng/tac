@@ -1,8 +1,8 @@
 # Tack
 
-[![Crates.io Version](https://img.shields.io/crates/v/tac-k)](https://crates.io/crates/tac-k) [![docs.rs](https://img.shields.io/docsrs/tac-k)](https://docs.rs/tac-k/) ![Crates.io License](https://img.shields.io/crates/l/tac-k) ![Crates.io MSRV](https://img.shields.io/crates/msrv/tac-k?color=slateblue)
+[![Crates.io Version](https://img.shields.io/crates/v/tac-k)](https://crates.io/crates/tac-k) [![docs.rs](https://img.shields.io/docsrs/tac-k-lib)](https://docs.rs/tac-k-lib/) ![Crates.io License](https://img.shields.io/crates/l/tac-k) ![Crates.io MSRV](https://img.shields.io/crates/msrv/tac-k?color=slateblue)
 
-Tack is a **fork** of the [tac](https://github.com/neosmart/tac) crate.
+Tack is a **fork** of the [tac](https://github.com/neosmart/tac) crate. It is available as a standalone binary, [tac-k](https://crates.io/crates/tac-k), and as a library, [tac-k-lib](https://crates.io/crates/tac-k-lib).
 
 Tack is a high-performance, simd-accelerated, cross-platform rewrite of the [GNU `tac` utility](https://www.gnu.org/software/coreutils/manual/html_node/tac-invocation.html#tac-invocation) from Coreutils, released under MIT/Apache-2.0 licenses. `tac` reads input from a file (or from `stdin`, but [see below](#implementation-notes)) and then prints it line-by-line backwards.
 
@@ -45,7 +45,7 @@ wohello%
 
 ## Installation
 
-Tack may be built installed via cargo, the rust package manager:
+The tack binary may be built installed via cargo, the rust package manager:
 
 ```bash
 cargo install tac-k --locked
@@ -55,6 +55,12 @@ or installed with pre-built binaries via `cargo-binstall`:
 
 ```bash
 cargo binstall tac-k --locked
+```
+
+The tack library can be added to your project via:
+
+```bash
+cargo add tac-k-lib
 ```
 
 ## Implementation Notes
