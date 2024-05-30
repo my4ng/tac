@@ -1,5 +1,7 @@
-[package]
-name = "tac-k"
+[workspace]
+members = [".", "src/tac-k-lib"]
+
+[workspace.package]
 edition = "2021"
 version = "0.3.1"
 authors = ["Michael Yang <admin@my4ng.dev>"]
@@ -12,14 +14,37 @@ categories = ["command-line-utilities"]
 rust-version = "1.70"
 license = "MIT OR Apache-2.0"
 
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0"
 memmap2 = "0.9"
 
-[dependencies.clap]
+[workspace.dependencies.tac-k-lib]
+path = "src/tac-k-lib"
+version = "0.3.1"
+
+[workspace.dependencies.clap]
 version = "~4.4"
 default-features = false
 features = ["std", "help", "usage", "cargo", "error-context"]
+
+[package]
+name = "tac-k"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+tac-k-lib.workspace = true
+anyhow.workspace = true
+clap.workspace = true
 
 [[bin]]
 name = "tac"

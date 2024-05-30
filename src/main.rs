@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{command, crate_authors, crate_description, crate_version, Arg, ArgAction};
-use tac_k::reverse_file;
+use tac_k_lib::reverse_file;
 
 use std::{
     io::{BufWriter, IsTerminal, StdoutLock, Write},

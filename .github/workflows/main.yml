@@ -28,8 +28,8 @@ jobs:
 
       - name: Checks
         run: |
-          cargo fmt --check
-          cargo clippy --all-targets
+          cargo fmt --all --check
+          cargo clippy --all-targets --all-features
 
   test-msrv:
     runs-on: ubuntu-latest
