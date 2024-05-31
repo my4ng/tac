@@ -3,7 +3,7 @@ members = [".", "src/tac-k-lib"]
 
 [workspace.package]
 edition = "2021"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Michael Yang <admin@my4ng.dev>"]
 description = "Print lines from file in reverse order"
 homepage = "https://github.com/my4ng/tack"
@@ -20,7 +20,7 @@ memmap2 = "0.9"
 
 [workspace.dependencies.tac-k-lib]
 path = "src/tac-k-lib"
-version = "0.3.2"
+version = "0.3.3"
 
 [workspace.dependencies.clap]
 version = "~4.4"
