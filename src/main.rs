@@ -2,10 +2,8 @@ use anyhow::Result;
 use clap::{command, crate_authors, crate_description, crate_version, Arg, ArgAction};
 use tac_k_lib::reverse_file;
 
-use std::{
-    io::{BufWriter, IsTerminal, StdoutLock, Write},
-    path::Path,
-};
+use std::io::{BufWriter, IsTerminal, StdoutLock, Write};
+
 enum Writer {
     StdOut(StdoutLock<'static>),
     Buffered(BufWriter<StdoutLock<'static>>),
@@ -93,7 +91,7 @@ fn main() -> Result<()> {
 
 #[inline]
 fn reverse<W: Write>(writer: &mut W, file: &str, separator: u8) -> Result<()> {
-    let path = if file == "-" { None } else { Some(Path::new(file)) };
+    let path = if file == "-" { None } else { Some(file) };
     reverse_file(writer, path, separator)?;
     Ok(())
 }
